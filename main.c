@@ -209,7 +209,7 @@ void execute_instruction (uint32_t instruction) {
                 CURRENT_STATE.REGS[instruc.rd] - (CURRENT_STATE.REGS[instruc.rs] + CURRENT_STATE.REGS[instruc.rt]);
         CURRENT_STATE.REGS[instruc.rd] = NEXT_STATE.REGS[instruc.rd];
     } else if (instruc.opc == SW) {
-        mem_write(NEXT_STATE.REGS[instruc.rs] + instruc.im, NEXT_STATE.REGS[instruc.rt]);
+        mem_write( CURRENT_STATE.REGS[instruc.rs] + instruc.im, CURRENT_STATE.REGS[instruc.rt]);
     } else if (instruc.opc == LW) {
         NEXT_STATE.REGS[instruc.rt] = mem_read(NEXT_STATE.REGS[instruc.rs] + instruc.im);
         CURRENT_STATE.REGS[instruc.rs] = NEXT_STATE.REGS[instruc.rs];
@@ -233,7 +233,7 @@ void reg_value_init () {
     time_t t;
     srand(time(&t));
     for (int i=0 ; i<32; i++ ){
-        CURRENT_STATE.REGS[i]=1+ rand ()%1000;
+        CURRENT_STATE.REGS[i]=1+ rand ()%50;
     }
 }
 
@@ -259,7 +259,7 @@ void procitaj () {
 int main(void)
 {
     init_memory();
-    load_program("input/program.txt");
+    load_program("Resources/program.txt");
 
     printf ("Pocetne vrijednosti registara: \n");
     reg_value_init();
@@ -276,11 +276,8 @@ int main(void)
     } while (p<LAST_STATE.PC);
 
     printf ("Krajnje vrijednosti registara: \n");
-    reg_value_init();
     reg_state();
     printf ("Krajnje stanje podrucija podataka: \n");
-    napuni();
-    
     procitaj();
     return 0;
 }
