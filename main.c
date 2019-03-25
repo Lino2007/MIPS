@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #define MIPS_REGS 32 // broj registara
 #define MEM_DATA_START 0x00000000 // početak dijela memorije za podatke
@@ -32,6 +33,12 @@ mem_region MEM_REGIONS[] = {
 // trenutno stanje CPU-a
 CPU_State CURRENT_STATE, NEXT_STATE, LAST_STATE;
 
+typedef struct  {
+    enum {ADD, SUB, SW, LW} opc;
+    uint32_t  rd,rt, rs,im;
+    enum {RF, IF} form;
+} CUR_inst;
+CUR_inst instruc;
 
 // funkcija koja piše u glavnu memoriju
 void mem_write(uint32_t address, uint32_t value)
@@ -89,7 +96,10 @@ void load_program(char *program_filename)
         printf("#Greska: Datoteka nije otvorena\n");
         return ;
     }
-    uint32_t w=0, adresa=MEM_INSTRUCTIONS_START;
+    time_t t;
+    srand(time(&t));
+    //random vrijednost iz intervala [1,1000]
+    uint32_t w=1+rand()%1000, adresa=MEM_INSTRUCTIONS_START;
     //U globalnom opsegu je definiran dodatni parametar tipa CPU_State
     while (fscanf (ulaz,"%x\n", &w)!=EOF) {
         mem_write (adresa,w);
@@ -100,44 +110,76 @@ void load_program(char *program_filename)
     fclose(ulaz);
 }
 
-// funkcija koja dekodira instrukciju
+void flush_instruction () {
+    instruc.im=instruc.opc=instruc.form=instruc.rd=instruc.rs=instruc.rt=-1;
+}
+
+
 void decode_instruction(uint32_t instruction)
 {
+    flush_instruction();
     uint32_t opcode=(instruction>>26)&0x3F;
     int rs = (instruction>>21)&0x1F;
     //  char registri[]= {"$0","$s", "$t" };
     if (opcode==0) {
         int funct=instruction&0x3F;
-        if (funct==32) printf ("add");
-        else if (funct==34) printf ("sub");
-        else { printf ("Neka druga instrukcija");
+
+        instruc.opc=-1;
+        instruc.form=RF;
+        int rd=(instruction>>16)&0x1F, rt=(instruction>>11)&0x1F;
+        //Provjera validnosti registara
+        if ( rt<8 || rt>23 || rs<8 || rs>23 || rd<8 || rd>23) {
+            printf ("Neka druga instrukcija\n");
+            goto Label;
+        }
+        ////////////////////////////////
+        //Koja je operacija u pitanju
+        if (funct==32 ) {
+            printf("add");
+            instruc.opc=ADD;
+        }
+        else if (funct==34  ) {
+            printf ("sub");
+            instruc.opc=SUB;
+        }
+        else  { printf ("Neka druga instrukcija");
             goto Label;
             return ;
         }
-
-        int rd=(instruction>>16)&0x1F, rt=(instruction>>11)&0x1F;
+        /////////////////////////////
+        //Postavka registara
+        //Za RT
         if (rt>=8 && rt<=15) {
-            printf (" $t%d,", rt-8);
-        } else   printf (" $s%d,", rt-16);
-
+            printf (" $t%d,", (instruc.rd=rt)-8);
+        } else   printf (" $s%d,", (instruc.rd=rt)-16);
+        //////////////////////
+        //RS
         if (rs>=8 && rs<=15) {
-            printf (" $t%d,", rs-8);
+            printf (" $t%d,", (instruc.rs=rs)-8);
         } else if (rs==0)  printf (" $0,");
-        else   printf (" $s%d,", rs-16);
-
+        else if (rs>=16 && rs<=23)   printf (" $s%d,", (instruc.rs=rs)-16);
+        ////////////////////
+        //RD
         if (rd>=8 && rd<=15) {
-            printf (" $t%d", rd-8);
+            printf (" $t%d", (instruc.rt=rd)-8);
         } else if (rd==0)  printf ("$0");
-        else   printf (" $s%d", rd-16);
-
+        else   printf (" $s%d",  (instruc.rt=rd)-16);
+       /////////////////////
+      // printf ("%d %d %d %d %d ")
     } else {
         short int imm= instruction&0xFFFF;
         int rt=(instruction>>16)&0x1F;
-
+        instruc.im=imm;
+       /* if ( rt<8 || rt>23 || rs<8 || rs>23) {
+            printf ("Neka druga instrukcija\n");
+            goto Label;
+        } */
         if (opcode==35) {
             printf ("lw ");
+            instruc.opc=LW;
         } else   if (opcode==43) {
             printf ("sw ");
+            instruc.opc=SW;
         } else {
             printf("Neka druga instrukcija");
             goto Label;
@@ -145,15 +187,15 @@ void decode_instruction(uint32_t instruction)
         }
 
         if (rt>=8 && rt<=15) {
-            printf (" $t%d,", rt-8);
+            printf (" $t%d,", (instruc.rt=rt)-8);
         } else if (rt==0)  printf (" $0,");
-        else   printf (" $s%d,", rt-16);
+        else   printf (" $s%d,", (instruc.rt=rt)-16);
 
 
         if (rs>=8 && rs<=15) {
-            printf ("%d($t%d)", imm,rs-8);
+            printf ("%d($t%d)", imm, (instruc.rs=rs)-8);
         } else if (rs==0)  printf (" $0");
-        else   printf ("%d($s%d)", imm,rs-16);
+        else   printf ("%d($s%d)", imm, (instruc.rs=rs)-16);
 
 
     }
@@ -163,17 +205,58 @@ void decode_instruction(uint32_t instruction)
     }
 }
 
+void execute_instruction (uint32_t instruction) {
+     decode_instruction(instruction);
+     if (instruc.opc==ADD ){
+         NEXT_STATE.REGS[instruc.rd]=CURRENT_STATE.REGS[instruc.rd]+(CURRENT_STATE.REGS[instruc.rs]+CURRENT_STATE.REGS[instruc.rt]);
+       CURRENT_STATE.REGS[instruc.rd]=NEXT_STATE.REGS[instruc.rd];
+
+     }
+     else if (instruc.opc==SUB) {
+         NEXT_STATE.REGS[instruc.rd]=CURRENT_STATE.REGS[instruc.rd] - (CURRENT_STATE.REGS[instruc.rs] + CURRENT_STATE.REGS[instruc.rt]);
+         CURRENT_STATE.REGS[instruc.rd] = NEXT_STATE.REGS[instruc.rd];
+     }
+     else if (instruc.opc==SW ) {
+
+     }
+     else if (instruc.opc==LW) {
+         uint8_t *pom= (uint8_t *) (MEM_DATA_START+instruc.rs+ instruc.im);
+         uint8_t *poms= (uint8_t *) (MEM_DATA_START);
+       NEXT_STATE.REGS[instruc.rs]= (poms);
+         CURRENT_STATE.REGS[instruc.rs] = NEXT_STATE.REGS[instruc.rs];
+         printf ("%d", CURRENT_STATE.REGS[instruc.rs]);
+     }
+     else {
+         printf("Instrukcija nije podrzana ili ne postoji!\n");
+     }
+     flush_instruction();
+
+}
+
+void reg_state () {
+    for (int i=0 ; i<32; i++ ){
+        printf ("Registar %d : %x \n", i, CURRENT_STATE.REGS[i]);
+    }
+}
+void reg_value_init () {
+    for (int i=0 ; i<32; i++ ){
+       CURRENT_STATE.REGS[i]=i;
+    }
+}
 
 
-
-int main()
+int main(void)
 {
     init_memory();
     load_program("Resources/program.txt");
+    reg_value_init();
+  //  reg_state();
     uint32_t p=MEM_INSTRUCTIONS_START;
+    printf ("Izvrsene su sljedece instrukcije: \n");
     do {
-        decode_instruction(mem_read(p));
+        execute_instruction(mem_read(p));
         p+=4;
     } while (p<LAST_STATE.PC);
+ //   reg_state();
     return 0;
 }
