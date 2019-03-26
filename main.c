@@ -222,13 +222,13 @@ void execute_instruction (uint32_t instruction) {
     flush_instruction();
 }
 
-//Provjera sadrzaja registara
+//provjera sadrzaja registara
 void reg_state () {
     for (int i=0 ; i<32; i++ ){
         printf ("Registar %d : %x \n", i, CURRENT_STATE.REGS[i]);
     }
 }
-//Punimo registre random vrijednostima
+//punimo registre random vrijednostima
 void reg_value_init () {
     time_t t;
     srand(time(&t));
@@ -237,7 +237,7 @@ void reg_value_init () {
     }
 }
 
-//Punimo podrucije memorije sa random vrijednostima
+//punimo podrucje memorije sa random vrijednostima
 void napuni () {
     time_t t;
     srand(time(&t));
@@ -247,7 +247,7 @@ void napuni () {
     }
 }
 
-//Provjera da li je podrucije memorije popunjeno
+//provjera da li je podrucje memorije popunjeno
 void procitaj () {
     for (int i = 0 ; i<MEM_DATA_START+MEM_DATA_SIZE; i=i+4) {
         printf( "%d: %x ", i/4, mem_read (MEM_DATA_START+i));
