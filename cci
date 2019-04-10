@@ -1,0 +1,57 @@
+Option Explicit 'pomaze prilikom detekcije nedefinisanih var'
+Public Sub Main()
+ Dim c As AcadCircle
+ Dim centar(0 To 2) As Double
+ Dim s As String
+ 
+ s = InputBox("Unesite centar (x,y,z)", "Centar", "0,0,0")
+ Dim v As Variant 'jer je sad s tipa variant'
+ v = Split(s, ",")
+ 
+ Dim i As Integer
+ 'For i = 0 To 20 Step 3 i+3'
+' Next i da nije naveden step po defaultu je i+1'
+For i = 0 To UBound(v)
+centar(i) = CDbl(v(i))
+Next i
+ 
+ 
+ 
+ centar(0) = 1 'x
+  centar(1) = 1 'y
+   centar(2) = 0 'z
+   Dim rv As Double
+   'za korisnicki unos'
+   '1,1,0
+  rv = CDbl(InputBox("Unesite radijus", "Unos radijusa", "25"))
+   'r = 10'
+   'model spaceom pristupamo acad radnoj povrsini'
+   Set c = ThisDrawing.ModelSpace.AddCircle(centar, r)
+   'krug je ovom komandom SAMO dodan, acad odlucuje kad ce se krug pojaviti u refresh ciklusu'
+   c.Update 'forsiramo iscrtavanje'
+   
+   'sad iscrtavamo vanjske krugove'
+   
+   Dim ru As Double
+   ru = CDbl(InputBox("Unesite radijus unutrasnje: "))
+   
+   Dim broj As Integer
+   broj = CInt(InputBox("Unesite broj vanjskih: "))
+   Dim centarv As Variant
+   Dim pi As Double
+   pi = 4# * Math.Atn(1#)
+   ugao = (2# * pi) / broj
+   Dim rv As Double
+   'za polarne koordinate'
+   For i = 0 To broj - 1
+    centarv = ThisDrawing.Utility.PolarPoint(centar, ugao, ru + rv) 'ugao je u radijanima'
+    Set c = ThisDrawing.ModelSpace.AddCircle(centarv, rv)
+    c.Update
+    
+ Next i
+    'za double pri deklaraciji 4.0 i 4#'
+    'za float 4!'
+    
+    
+   
+End Sub
